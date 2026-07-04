@@ -24,7 +24,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             remote_id INTEGER,
             label TEXT,
-            message TEXT,
+            message TEXT
         )
         """
     )

@@ -2,6 +2,9 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
+#db routes
+@app.route("/init", methods=["GET"])
+
 # esp32 routes
 @app.route('/ir/upload', methods=['POST'])
 def ir_rcv_and_save():
