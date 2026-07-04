@@ -79,6 +79,17 @@ def create_button(remote_id):
         return jsonify({"status": "error", "message": "Remote not found"}), 404 
 
 
+@app.route('/remotes/<remote_id>/buttons', methods=['GET'])
+def get_buttons(remote_id):
+    try:    
+        
+        database.get_buttons(remote_id) 
+        return jsonify({"status": "ok"}), 201
+    
+    except ValueError:
+        return jsonify({"status": "error", "message": "Remote not found"}), 404 
+
+
 @app.route('/remotes/<remote_id>/buttons/<button_id>', methods=['PUT'])
 def update_button(remote_id, button_id):
     try:    

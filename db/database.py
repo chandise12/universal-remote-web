@@ -129,8 +129,8 @@ def get_buttons(remote_id):
 
     conn.close()
 
-    if not rows:
-        return None
+    if rows is None:
+        raise ValueError(f"No remote found with id {remote_id}")
     
     return [dict(row) for row in rows]
 
