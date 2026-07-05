@@ -44,60 +44,50 @@ def create_remote(label):
 def get_remote(remote_id):
     conn = get_db_connection()
 
-    row = conn.execute("SELECT * FROM remotes WHERE id = ?", (remote_id,) ).fetchone() 
+    result = conn.execute("SELECT * FROM remotes WHERE id = ?", (remote_id,) ).fetchone() 
     
     conn.close()
 
-    if row is None:
-        return None
+    if result is None:
+        raise ValueError(f"No remote found with id {remote_id}")
     
-    return dict(row)
+    return dict(result)
 
 def get_all_remotes():
     conn = get_db_connection()
 
-    rows = conn.execute("SELECT * FROM remotes").fetchall() 
+    result = conn.execute("SELECT * FROM remotes").fetchall() 
 
     conn.close()
 
-    if rows is None:
+    if result is None:
         return None
     
-    return [dict(row) for row in rows]
+    return [dict(row) for row in result]
 
 
 def update_label_remote(remote_id, label):
     conn = get_db_connection()
 
-    row = conn.execute(
-        "SELECT 1 FROM remotes WHERE id = ?",
-        (remote_id,)
-    ).fetchone()
+    result = conn.execute("UPDATE remotes SET label = ? WHERE id = ?", (label, remote_id,) ) 
+    
+    conn.close()
 
-    if row is None:
-        conn.close()
+    if result.rowcount == 0:
         raise ValueError(f"No remote found with id {remote_id}")
-
-    conn.execute("UPDATE remotes SET label = ? WHERE id = ?", (label, remote_id,) ) 
     
     conn.commit()
-    conn.close()
     return
 
 def delete_remote(remote_id):
     conn = get_db_connection()
 
-    row = conn.execute(
-        "SELECT 1 FROM remotes WHERE id = ?",
-        (remote_id,)
-    ).fetchone()
+    result = conn.execute("DELETE FROM remotes WHERE id = ?", (remote_id,) ) 
 
-    if row is None:
-        conn.close()
+    if result.rowcount == 0:
         raise ValueError(f"No remote found with id {remote_id}")
-
+    
     conn.execute("DELETE FROM buttons WHERE remote_id = ?", (remote_id,) ) 
-    conn.execute("DELETE FROM remotes WHERE id = ?", (remote_id,) ) 
 
     conn.commit()
     conn.close()
@@ -107,16 +97,12 @@ def delete_remote(remote_id):
 def create_button(remote_id, label):
     conn = get_db_connection()
 
-    row = conn.execute(
-        "SELECT 1 FROM remotes WHERE id = ?",
-        (remote_id,)
-    ).fetchone()
-
-    if row is None:
-        conn.close()
+    result = conn.execute("INSERT INTO buttons (remote_id, label) VALUES (?, ?)", (remote_id, label,) )
+    
+    conn.close()
+    
+    if result.rowcount == 0:
         raise ValueError(f"No remote found with id {remote_id}")
-
-    conn.execute("INSERT INTO buttons (remote_id, label) VALUES (?, ?)", (remote_id, label,) )
 
     conn.commit()
     conn.close()
@@ -125,69 +111,63 @@ def create_button(remote_id, label):
 def get_buttons(remote_id):
     conn = get_db_connection()
 
-    rows = conn.execute("SELECT * FROM buttons WHERE remote_id = ?", (remote_id,) ).fetchall() 
+    result = conn.execute("SELECT * FROM buttons WHERE remote_id = ?", (remote_id,) ).fetchall() 
 
     conn.close()
 
-    if rows is None:
+    if result is None:
         raise ValueError(f"No remote found with id {remote_id}")
     
-    return [dict(row) for row in rows]
+    return [dict(row) for row in result]
 
-def get_message_button(remote_id):
+def get_message_button(button_id, remote_id):
     conn = get_db_connection()
-
-    row = conn.execute("SELECT message FROM buttons WHERE remote_id = ?", (remote_id,) ).fetchone() 
+ 
+    result = conn.execute("SELECT message FROM buttons WHERE id = ? AND remote_id = ?", (button_id, remote_id,) ).fetchone() 
 
     conn.close()
+
+    if result.rowcount == 0:
+        raise ValueError(f"No button found with id {button_id} and remote_id {remote_id}")
     
-    if row is None:
-        return None
-    
-    return row["message"]
+    return result["message"]
 
 
-def update_message_button(button_id, message):
+def update_message_button(remote_id, button_id, message):
     conn = get_db_connection()
 
-    conn.execute("UPDATE buttons SET message = ? WHERE id = ?", (message, button_id,) ) 
+    result = conn.execute("UPDATE buttons SET message = ? WHERE id = ? AND remote_id = ?", (message, button_id, remote_id,) ) 
+    
+    conn.close()
+
+    if result.rowcount == 0:
+        raise ValueError(f"No button found with id {button_id} and remote_id {remote_id}")
     
     conn.commit()
-    conn.close()
     return
 
 def update_label_button(remote_id, button_id, label):
     conn = get_db_connection()
 
-    row = conn.execute(
-        "SELECT 1 FROM buttons WHERE id = ? AND remote_id = ?",
-        (button_id, remote_id,)
-    ).fetchone()
+    result = conn.execute("UPDATE buttons SET label = ? WHERE id = ? AND remote_id = ?", (label, button_id, remote_id,) ) 
 
-    if row is None:
-        conn.close()
+    conn.close()
+
+    if result.rowcount == 0:
         raise ValueError(f"No button found with id {button_id} and remote_id {remote_id}")
 
-    conn.execute("UPDATE buttons SET label = ? WHERE id = ? AND remote_id = ?", (label, button_id, remote_id,) ) 
-
     conn.commit()
-    conn.close()
     return
 
 def delete_button(remote_id, button_id):
     conn = get_db_connection()
 
-    row = conn.execute(
-        "SELECT 1 FROM buttons WHERE id = ? AND remote_id = ?",
-        (button_id, remote_id,)
-    ).fetchone()
+    result = conn.execute("DELETE FROM buttons WHERE id = ? AND remote_id = ?", (button_id, remote_id,) ) 
 
-    if row is None:
-        conn.close()
+    conn.close()
+
+    if result.rowcount == 0:
         raise ValueError(f"No button found with id {button_id} and remote_id {remote_id}")
 
-    conn.execute("DELETE FROM buttons WHERE id = ? AND remote_id = ?", (button_id, remote_id,) ) 
-
     conn.commit()
-    conn.close()
     return

@@ -3,6 +3,10 @@ from db import database
 
 app = Flask(__name__)
 
+esp_status = jsonify({"status": "IDLE"})
+
+user_status = jsonify({"status": "IDLE"})
+
 #db routes
 @app.route("/init", methods=["GET"])
 def init_db_route():
@@ -12,11 +16,33 @@ def init_db_route():
 # esp32 routes
 @app.route('/ir/upload', methods=['POST'])
 def ir_rcv_and_save():
-    pass
+    data = request.get_json()
+
+    if not data:
+        return {"error": "no data"}, 400
+
+    length = data.get("length")
+
+    if length is None:
+        return {"error": "missing length"}, 400
+
+    if length < 8:
+        esp_status["status"] = "RETRY_LISTEN"
+    else:
+        esp_status["status"] = "IDLE"
+
+    return jsonify(esp_status), 200
+
     
-@app.route('/ir/get_next', methods=['GET'])
-def ir_get_next():
-    pass
+@app.route('/ir/get_state', methods=['GET'])
+def ir_get_state():
+    return jsonify(esp_status), 200
+
+#js user event routes
+@app.route("/user_status", methods=["GET"])
+def get_user_status():
+    return jsonify(user_status), 200
+
 
 # web routes
 @app.route('/remotes', methods=['GET'])
@@ -113,6 +139,29 @@ def delete_button(remote_id, button_id):
     
     except ValueError:
         return jsonify({"status": "error", "message": "Remote/Button not found"}), 404 
+
+
+@app.route('/remotes/<remote_id>/buttons/<button_id>/command', methods=['POST'])
+def handle_button_command(remote_id, button_id):
+    try:
+        message = database.get_message_button(button_id, remote_id)
+
+        global esp_status
+        global user_status
+        if message is None: # we want to read the signal from original remote
+            esp_status = jsonify( {"status": "LISTEN", "remote": remote_id, "button": button_id} )
+            user_status = jsonify({"status": "Please wait to press remote button"})
+            
+            return jsonify({"status": "message to be received"}), 200
+        
+        else: # we want to transmit the signal to the device
+            esp_status = jsonify( {"status": "LISTEN", "remote": remote_id, "button": button_id} )
+            user_status = jsonify({"status": "Please wait to press remote button"})
+            
+            return jsonify({"status": "message to be transmitted"}), 200
+
+    except ValueError:
+        return jsonify({"status": "error", "message": "Remote/Button not found"}), 404
 
 
 if __name__ == '__main__':
