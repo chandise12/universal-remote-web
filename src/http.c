@@ -155,23 +155,83 @@ esp_err_t http_get_command(void)
     return err;
 }
 
-void get_task(void)
+uint32_t *json_to_int_arr(cJSON *json, size_t *out_len)
 {
-    http_get_command();
-
-    // Now parse local_response_buffer here
-    cJSON *json = cJSON_Parse(local_response_buffer);
-    if (json == NULL) {
-        const char *error_ptr = cJSON_GetErrorPtr();
-        if (error_ptr != NULL) {
-            ESP_LOGE(TAG, "Error: %s\n", error_ptr);
-        }
-        cJSON_Delete(json);
+    if (json == NULL || out_len == NULL) {
+        return NULL;
     }
 
-    cJSON *status = cJSON_GetObjectItem(json, "status");
-    if (cJSON_IsString(status) && (status->valuestring != NULL)) {
-        printf("Name: %s\n", status->valuestring);
+    cJSON *message = cJSON_GetObjectItem(json, "message");
+    if (!cJSON_IsArray(message)) {
+        return NULL;
+    }
+
+    size_t len = cJSON_GetArraySize(message);
+    if (len == 0) {
+        *out_len = 0;
+        return NULL;
+    }
+
+    uint32_t *arr = malloc(len * sizeof(uint32_t));
+    if (arr == NULL) {
+        return NULL;
+    }
+
+    for (size_t i = 0; i < len; i++) {
+        cJSON *item = cJSON_GetArrayItem(message, i);
+
+        if (cJSON_IsNumber(item)) {
+            arr[i] = (uint32_t)item->valuedouble;
+        } else {
+            // Handle unexpected type
+            arr[i] = 0;
+        }
+    }
+
+    *out_len = len;
+    return arr;
+}
+
+
+
+void get_task(void)
+{
+    while(1){
+
+        http_get_command();
+
+        // Now parse local_response_buffer here
+        cJSON *json = cJSON_Parse(local_response_buffer);
+        if (json == NULL) {
+            const char *error_ptr = cJSON_GetErrorPtr();
+            if (error_ptr != NULL) {
+                ESP_LOGE(TAG, "Error: %s\n", error_ptr);
+            }
+            cJSON_Delete(json);
+
+            continue;
+        }
+
+        cJSON *status = cJSON_GetObjectItem(json, "status");
+        if (cJSON_IsString(status) && (status->valuestring != NULL)) {
+            printf("Name: %s\n", status->valuestring);
+        }else{
+            continue;
+        }
+
+        char *transmit_str = "TRANSMIT";
+        char *listen_str = "LISTEN";
+
+        if( strcmp(status->valuestring, transmit_str) == 0 ){
+           
+            size_t msg_len = 0;
+            uint32_t *message = json_to_int_arr(json, &msg_len);
+
+        }else if( strcmp(status->valuestring, listen_str) == 0 ){
+
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(5000));
     }
 }
 

@@ -10,8 +10,7 @@ void app_main(){
     wifi_init();
     http_init();
 
-    while(1){
-        get_task();
-        vTaskDelay(pdMS_TO_TICKS(3000));
-    }
+    xTaskCreate(get_task, "GET Task", 4096, NULL, 5, NULL);
+
+    while(1);
 }
