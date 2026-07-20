@@ -1,11 +1,15 @@
 from flask import Flask, request, jsonify
 from db import database
+import json
 
 app = Flask(__name__)
 
-esp_status = jsonify({"status": "IDLE"})
+esp_status = {"status": "IDLE",
+              "remote_id": None,
+              "button_id": None,
+              "message": None}
 
-user_status = jsonify({"status": "IDLE"})
+user_status = {"status": "IDLE"}
 
 #db routes
 @app.route("/init", methods=["GET"])
@@ -16,6 +20,8 @@ def init_db_route():
 # esp32 routes
 @app.route('/ir/upload', methods=['POST'])
 def ir_rcv_and_save():
+    global esp_status
+
     data = request.get_json()
 
     if not data:
@@ -26,7 +32,7 @@ def ir_rcv_and_save():
     if length is None:
         return {"error": "missing length"}, 400
 
-    if length < 8:
+    if length < 8: 
         esp_status["status"] = "RETRY_LISTEN"
     else:
         esp_status["status"] = "IDLE"
@@ -148,14 +154,25 @@ def handle_button_command(remote_id, button_id):
 
         global esp_status
         global user_status
+
         if message is None: # we want to read the signal from original remote
-            esp_status = jsonify( {"status": "LISTEN", "remote": remote_id, "button": button_id} )
+            esp_status["status"] = "LISTEN"
+            esp_status["remote_id"] = remote_id
+            esp_status["button_id"] = button_id
+
             user_status = jsonify({"status": "Please wait to press remote button"})
             
             return jsonify({"status": "message to be received"}), 200
         
         else: # we want to transmit the signal to the device
-            esp_status = jsonify( {"status": "LISTEN", "remote": remote_id, "button": button_id} )
+            # Convert string to list
+            message = json.loads(message)
+
+            esp_status["status"] = "TRANSMIT"
+            esp_status["remote_id"] = remote_id
+            esp_status["button_id"] = button_id
+            esp_status["message"] = message
+
             user_status = jsonify({"status": "Please wait to press remote button"})
             
             return jsonify({"status": "message to be transmitted"}), 200
