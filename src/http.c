@@ -11,6 +11,7 @@
 #include "esp_tls.h"
 #include "cJSON.h"
 #include "LOGIN.h"
+#include "rx_tx.h"
 
 #define MAX_HTTP_RECV_BUFFER 512
 #define MAX_HTTP_OUTPUT_BUFFER 2048
@@ -163,10 +164,13 @@ uint32_t *json_to_int_arr(cJSON *json, size_t *out_len)
 
     cJSON *message = cJSON_GetObjectItem(json, "message");
     if (!cJSON_IsArray(message)) {
+        printf("is not an array\n");
         return NULL;
     }
 
     size_t len = cJSON_GetArraySize(message);
+    printf("length of message: %d\n", len);
+
     if (len == 0) {
         *out_len = 0;
         return NULL;
@@ -222,14 +226,29 @@ void get_task(void)
         char *transmit_str = "TRANSMIT";
         char *listen_str = "LISTEN";
 
-        if( strcmp(status->valuestring, transmit_str) == 0 ){
+        if( strcmp(status->valuestring, transmit_str) == 0 ){ // check if command is TRANSMIT
            
+            ESP_LOGE(TAG, "COMMAND IS TRANSIT\n");
+
             size_t msg_len = 0;
             uint32_t *message = json_to_int_arr(json, &msg_len);
+            
+            if(message == NULL || msg_len == 0){
+                continue;
+            }
+
+            //transmit message
+            transmit_message(message, msg_len);
+
+            free(message);
 
         }else if( strcmp(status->valuestring, listen_str) == 0 ){
-
+            ESP_LOGE(TAG, "COMMAND IS LISTEN\n");
+        }else{
+            ESP_LOGE(TAG, "COMMAND IS IDLE\n");
         }
+
+
 
         vTaskDelay(pdMS_TO_TICKS(5000));
     }
