@@ -9,22 +9,18 @@
 #include "driver/gptimer.h"
 #include "esp_timer.h"
 
+extern TaskHandle_t get_task_handle;
+
 void app_main(){
 
     ESP_ERROR_CHECK(nvs_flash_init()); 
     wifi_init();
     http_init();
     pwm_init();
+    queue_init();
 
-    // while(1){
-    //     pulse_us(10000);  // ON
-    //     pulse_us(10000);  // OFF
-    //     pulse_us(10000);  // ON
-    //     pulse_us(10000);  // OFF
-    // }
-
-
-    xTaskCreate(get_task, "GET Task", 4096, NULL, 5, NULL);
+    xTaskCreate(get_task, "GET Task", 4096, NULL, 5, &get_task_handle);
+    xTaskCreate(upload_message, "POST message", 4096, NULL, 6, NULL);
     // get_task();
 
 }

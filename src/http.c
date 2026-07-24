@@ -13,6 +13,7 @@
 #include "LOGIN.h"
 #include "rx_tx.h"
 
+#define GET_TASK_PERIOD 1000 // 1000ms = 1 s
 #define MAX_HTTP_RECV_BUFFER 512
 #define MAX_HTTP_OUTPUT_BUFFER 2048
 
@@ -22,7 +23,15 @@ static char local_response_buffer[MAX_HTTP_OUTPUT_BUFFER + 1];
 static int output_len = 0;
 
 esp_http_client_handle_t get_client = NULL;
-esp_http_client_handle_t post_client = NULL;
+esp_http_client_handle_t post_client_clear = NULL;
+esp_http_client_handle_t post_client_upload = NULL;
+
+int curr_remote_id = -1;
+int curr_button_id = -1; 
+
+TaskHandle_t get_task_handle;
+extern QueueHandle_t tx_queue;
+extern volatile bool ir_capturing;
 
 
 
@@ -79,12 +88,12 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
             break;
 
         case HTTP_EVENT_DISCONNECTED:
-            ESP_LOGI(TAG, "HTTP_EVENT_DISCONNECTED");
+            // ESP_LOGI(TAG, "HTTP_EVENT_DISCONNECTED");
             int mbedtls_err = 0;
             esp_err_t err = esp_tls_get_and_clear_last_error((esp_tls_error_handle_t)evt->data, &mbedtls_err, NULL);
             if (err != 0) {
-                ESP_LOGI(TAG, "Last esp error code: 0x%x", err);
-                ESP_LOGI(TAG, "Last mbedtls failure: 0x%x", mbedtls_err);
+                // ESP_LOGI(TAG, "Last esp error code: 0x%x", err);
+                // ESP_LOGI(TAG, "Last mbedtls failure: 0x%x", mbedtls_err);
             }
             _output_len = 0;
             break;
@@ -100,6 +109,8 @@ esp_err_t _http_event_handler(esp_http_client_event_t *evt)
 }
 
 esp_err_t http_init(){
+
+    // INITIALIZE "GET" STATE
     esp_http_client_config_t config = {
         .url = COMMAND_URL,
         .event_handler = _http_event_handler,
@@ -115,12 +126,55 @@ esp_err_t http_init(){
 
     esp_http_client_set_method(get_client, HTTP_METHOD_GET);
 
+
+    // INITIALIZE "POST" CLEAR TASK
+    esp_http_client_config_t post_config_clr = {
+        .url = CLEAR_URL,
+        .event_handler = _http_event_handler,
+        .user_data = NULL,
+    };
+
+    post_client_clear = esp_http_client_init(&post_config_clr);
+
+    if (post_client_clear == NULL) {
+        ESP_LOGE(TAG, "Failed to initialize HTTP POST clear client");
+        return ESP_FAIL;
+    }
+
+    esp_http_client_set_method(post_client_clear, HTTP_METHOD_POST);
+
+
+    // INITIALIZE "POST" UPLOAD TASK
+    esp_http_client_config_t post_config_upld = {
+        .url = UPLOAD_URL,
+        .event_handler = _http_event_handler
+    };
+
+    post_client_upload = esp_http_client_init(&post_config_upld);
+
+    if (post_client_upload == NULL) {
+        ESP_LOGE(TAG, "Failed to initialize HTTP POST upload client");
+        return ESP_FAIL;
+    }
+
+    esp_http_client_set_method(post_client_upload, HTTP_METHOD_POST);
+
+
     return ESP_OK;
+}
+
+void queue_init()
+{
+    tx_queue = xQueueCreate(5, sizeof(ir_message_t));
+
+    if(tx_queue == NULL){
+        ESP_LOGE(TAG, "Failed to create IR queue");
+    }
 }
 
 esp_err_t http_deinit(){
     esp_http_client_cleanup(get_client);
-    esp_http_client_cleanup(post_client);
+    esp_http_client_cleanup(post_client_clear);
 
     return ESP_OK;
 }
@@ -148,9 +202,6 @@ esp_err_t http_get_command(void)
         else {
             ESP_LOGW(TAG,  "Server returned status %d", status);
         }
-    }
-    else {
-        ESP_LOGE(TAG, "HTTP GET failed: %s", esp_err_to_name(err));
     }
 
     return err;
@@ -197,9 +248,69 @@ uint32_t *json_to_int_arr(cJSON *json, size_t *out_len)
 }
 
 
+void clear_task(){
+    esp_err_t err = esp_http_client_perform(post_client_clear);
+    if (err == ESP_OK) {
+        ESP_LOGI(TAG, "HTTP POST Status = %d, content_length = %"PRId64,
+            esp_http_client_get_status_code(post_client_clear));
+    } else {
+        // ESP_LOGE(TAG, "HTTP POST request failed: %s", esp_err_to_name(err));
+    }
+}
 
-void get_task(void)
-{
+void post_msg_http(ir_message_t *message){
+
+    cJSON *json = cJSON_CreateObject();
+    cJSON_AddNumberToObject(json, "length", message->length);
+    cJSON_AddNumberToObject(json, "remote_id", curr_remote_id);
+    cJSON_AddNumberToObject(json, "button_id", curr_button_id);
+
+    curr_remote_id = -1;
+    curr_button_id = -1; 
+
+    cJSON *array = cJSON_AddArrayToObject(json, "message");
+
+    for(int i = 0; i < message->length; i++)
+    {
+        cJSON_AddItemToArray(array, cJSON_CreateNumber(message->pulses[i]));
+    }
+
+    char *json_string = cJSON_PrintUnformatted(json);
+    ESP_LOGI(TAG, "Sending: %s", json_string);
+
+    esp_http_client_set_header(post_client_upload, "Content-Type", "application/json");
+    esp_http_client_set_post_field(post_client_upload, json_string, strlen(json_string));
+
+    esp_err_t err = esp_http_client_perform(post_client_upload);
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "HTTP POST Status = %d"PRId64,
+                    esp_http_client_get_status_code(post_client_upload));
+        } else {
+            ESP_LOGE(TAG, "HTTP POST request failed: %s", esp_err_to_name(err));
+        }
+
+    cJSON_Delete(json);
+    free(json_string);
+
+    // wake get_task
+    vTaskNotifyGiveFromISR(get_task_handle, NULL);
+}
+
+void upload_message(void *arg){
+
+    ir_message_t message;
+
+    while(1){
+        if(xQueueReceive(tx_queue, &message, portMAX_DELAY))
+        {
+            ESP_LOGI(TAG, "Sending IR signal");
+
+            post_msg_http(&message);
+        }
+    }
+}
+
+void get_task(void){
     while(1){
 
         http_get_command();
@@ -215,11 +326,10 @@ void get_task(void)
 
             continue;
         }
+        ESP_LOGI(TAG, "RAW JSON: %s", local_response_buffer);
 
         cJSON *status = cJSON_GetObjectItem(json, "status");
-        if (cJSON_IsString(status) && (status->valuestring != NULL)) {
-            printf("Name: %s\n", status->valuestring);
-        }else{
+        if (!cJSON_IsString(status) || (status->valuestring == NULL)) {
             continue;
         }
 
@@ -244,101 +354,27 @@ void get_task(void)
 
         }else if( strcmp(status->valuestring, listen_str) == 0 ){
             ESP_LOGE(TAG, "COMMAND IS LISTEN\n");
+            cJSON *remote_id = cJSON_GetObjectItem(json, "remote_id");
+            cJSON *button_id = cJSON_GetObjectItem(json, "button_id");
+
+            curr_remote_id = remote_id->valueint;
+            curr_button_id = button_id->valueint;
+
+            printf("remote: %d, button: %d\n", curr_remote_id, curr_button_id);
+
+            ir_start_capture(remote_id, button_id);
+
+            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+
         }else{
-            ESP_LOGE(TAG, "COMMAND IS IDLE\n");
+            ESP_LOGE(TAG, "COMMAND IS %s\n", status->valuestring);
         }
 
+        cJSON_Delete(json);
+        
+        // clear task on database end
+        clear_task();
 
-
-        vTaskDelay(pdMS_TO_TICKS(5000));
+        vTaskDelay(pdMS_TO_TICKS(GET_TASK_PERIOD));
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// static void http_rest_with_url(void)
-// {
-//     // Declare local_response_buffer with size (MAX_HTTP_OUTPUT_BUFFER + 1) to prevent out of bound access when
-//     // it is used by functions like strlen(). The buffer should only be used upto size MAX_HTTP_OUTPUT_BUFFER
-//     char local_response_buffer[MAX_HTTP_OUTPUT_BUFFER + 1] = {0};
-//     /**
-//      * NOTE: All the configuration parameters for http_client must be specified either in URL or as host and path parameters.
-//      * If host and path parameters are not set, query parameter will be ignored. In such cases,
-//      * query parameter should be specified in URL.
-//      *
-//      * If URL as well as host and path parameters are specified, values of host and path will be considered.
-//      */
-//     esp_http_client_config_t config = {
-//         .host = CONFIG_EXAMPLE_HTTP_ENDPOINT,
-//         .path = "/get",
-//         .query = "esp",
-//         .event_handler = _http_event_handler,
-//         .user_data = local_response_buffer,        // Pass address of local buffer to get response
-//         .disable_auto_redirect = true,
-//     };
-//     ESP_LOGI(TAG, "HTTP request with url =>");
-//     esp_http_client_handle_t client = esp_http_client_init(&config);
-
-//     // GET
-//     esp_err_t err = esp_http_client_perform(client);
-//     if (err == ESP_OK) {
-//         ESP_LOGI(TAG, "HTTP GET Status = %d, content_length = %"PRId64,
-//                 esp_http_client_get_status_code(client),
-//                 esp_http_client_get_content_length(client));
-//     } else {
-//         ESP_LOGE(TAG, "HTTP GET request failed: %s", esp_err_to_name(err));
-//     }
-//     ESP_LOG_BUFFER_HEX(TAG, local_response_buffer, strlen(local_response_buffer));
-
-//     // POST
-//     const char *post_data = "{\"field1\":\"value1\"}";
-//     esp_http_client_set_url(client, "http://"CONFIG_EXAMPLE_HTTP_ENDPOINT"/post");
-//     esp_http_client_set_method(client, HTTP_METHOD_POST);
-//     esp_http_client_set_header(client, "Content-Type", "application/json");
-//     esp_http_client_set_post_field(client, post_data, strlen(post_data));
-//     err = esp_http_client_perform(client);
-//     if (err == ESP_OK) {
-//         ESP_LOGI(TAG, "HTTP POST Status = %d, content_length = %"PRId64,
-//                 esp_http_client_get_status_code(client),
-//                 esp_http_client_get_content_length(client));
-//     } else {
-//         ESP_LOGE(TAG, "HTTP POST request failed: %s", esp_err_to_name(err));
-//     }
-
-//     //PUT
-//     esp_http_client_set_url(client, "http://"CONFIG_EXAMPLE_HTTP_ENDPOINT"/put");
-//     esp_http_client_set_method(client, HTTP_METHOD_PUT);
-//     err = esp_http_client_perform(client);
-//     if (err == ESP_OK) {
-//         ESP_LOGI(TAG, "HTTP PUT Status = %d, content_length = %"PRId64,
-//                 esp_http_client_get_status_code(client),
-//                 esp_http_client_get_content_length(client));
-//     } else {
-//         ESP_LOGE(TAG, "HTTP PUT request failed: %s", esp_err_to_name(err));
-//     }
-
-//     //PATCH
-//     esp_http_client_set_url(client, "http://"CONFIG_EXAMPLE_HTTP_ENDPOINT"/patch");
-//     esp_http_client_set_method(client, HTTP_METHOD_PATCH);
-//     esp_http_client_set_post_field(client, NULL, 0);
-//     err = esp_http_client_perform(client);
-//     if (err == ESP_OK) {
-//         ESP_LOGI(TAG, "HTTP PATCH Status = %d, content_length = %"PRId64,
-//                 esp_http_client_get_status_code(client),
-//                 esp_http_client_get_content_length(client));
-//     } else {
-//         ESP_LOGE(TAG, "HTTP PATCH request failed: %s", esp_err_to_name(err));
-//     }
-//     esp_http_client_cleanup(client);
-// }
