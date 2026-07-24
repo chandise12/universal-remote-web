@@ -27,15 +27,17 @@ def ir_rcv_and_save():
     if not data:
         return {"error": "no data"}, 400
 
-    length = data.get("length")
+    length = int(data.get("length"))
+    remote_id = int(data.get("remote_id"))
+    button_id = int(data.get("button_id"))
+    message = json.dumps(data.get("message"))
 
-    if length is None:
-        return {"error": "missing length"}, 400
 
-    if length < 8: 
-        esp_status["status"] = "RETRY_LISTEN"
-    else:
-        esp_status["status"] = "IDLE"
+    if length is None or remote_id is None or button_id is None or message is None:
+        return {"error": "missing information"}, 400
+
+    if length > 16: 
+        database.update_message_button(remote_id, button_id, message)
 
     return jsonify(esp_status), 200
 
@@ -43,6 +45,20 @@ def ir_rcv_and_save():
 @app.route('/ir/get_state', methods=['GET'])
 def ir_get_state():
     return jsonify(esp_status), 200
+
+
+@app.route('/ir/clear_task', methods=['POST'])
+def clear_task():
+
+    global esp_status
+
+    esp_status = {"status": "IDLE",
+              "remote_id": None,
+              "button_id": None,
+              "message": None}
+
+    return jsonify({"status": "ok"}), 200
+
 
 #js user event routes
 @app.route("/user_status", methods=["GET"])
@@ -147,7 +163,7 @@ def delete_button(remote_id, button_id):
         return jsonify({"status": "error", "message": "Remote/Button not found"}), 404 
 
 
-@app.route('/remotes/<remote_id>/buttons/<button_id>/command', methods=['POST'])
+@app.route('/remotes/<int:remote_id>/buttons/<int:button_id>/command', methods=['POST'])
 def handle_button_command(remote_id, button_id):
     try:
         message = database.get_message_button(button_id, remote_id)
