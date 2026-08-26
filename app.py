@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from db import database
 import json
 
@@ -70,7 +70,8 @@ def get_user_status():
 @app.route('/remotes', methods=['GET'])
 def get_remotes():
     data = database.get_all_remotes() 
-    return jsonify(data), 200
+    print(data)
+    return render_template('front_page.html', remotes=data)
 
 
 @app.route('/remotes', methods=['POST'])
@@ -130,8 +131,10 @@ def create_button(remote_id):
 @app.route('/remotes/<remote_id>/buttons', methods=['GET'])
 def get_buttons(remote_id):
     try:    
-        data = database.get_buttons(remote_id) 
-        return jsonify(data), 200
+        buttons = database.get_buttons(remote_id) 
+        remote = database.get_remote(remote_id)
+
+        return render_template('remote.html', remote=remote, buttons=buttons)
     
     except ValueError:
         return jsonify({"status": "error", "message": "Remote not found"}), 404 

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>IR Remote</title>
+</head>
+<body>
+    <h1>Remote Database</h1>
+
+    <h2>Remotes</h2>
+
+    <ul>
+        {% for remote in remotes %}
+            <li>
+                <a href="/remotes/{{ remote.id }}/buttons" >
+                    {{ remote.label }}
+                </a>
+
+                <button class="delete-remote" data-remote-id="{{ remote.id }}" > Delete</button>
+            </li>
+        {% endfor %}
+    </ul>
+
+    <form id="create-remote">
+        <div>
+            <label for="remote-label">Remote Name:</label>
+            <input type="text" id="remote-label" name="label">
+        </div>
+
+        <button type="submit">Add Remote</button>
+        <p id="error-empty-remote"></p>
+    </form>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<html>
+    <head>
+        <title>{{ remote.label }}</title>
+    </head>
+
+    <body>
+
+        <h1>{{ remote.label }}</h1>
+        
+        <a href="/remotes">Back</a>
+        
+        <h2>Buttons</h2>
+
+        <ul>
+            {% for button in buttons %}
+                <li>
+                    <a href="/remotes/{{ remote.id }}/buttons/{{ button.id }}">
+                        {{ button.label }}
+                    </a>
+    
+                    <button class="delete-button" data-remote-id="{{ remote.id }}" data-button-id="{{ button.id }}" > Delete </button>
+                </li>
+            {% endfor %}
+        </ul>
+
+        <form id="create-button" data-remote-id="{{ remote.id }}">
+            <div>
+                <label for="button-label">Button Name:</label>
+                <input type="text" id="button-label" name="label">
+            </div>
+    
+            <button type="submit">Add Button</button>
+            <p id="error-empty-button"></p>
+        </form>
+    
+        <script src="{{ url_for('static', filename='script.js') }}"></script>
+
+    </body>
+</html>
