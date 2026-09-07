@@ -14,6 +14,7 @@ body {
 
 h1 {
     margin-bottom: 10px;
+    text-align: center;
 }
 
 h2 {
@@ -39,7 +40,9 @@ ul {
 li {
     background: white;
     border: 1px solid #ddd;
-    border-radius: 8px;
+    border-radius: 16px;
+    border-width: 5px;
+    border-color: #4a4945;
 
     padding: 15px;
     margin-bottom: 12px;
