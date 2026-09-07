@@ -21,6 +21,4 @@ void app_main(){
 
     xTaskCreate(get_task, "GET Task", 4096, NULL, 5, &get_task_handle);
     xTaskCreate(upload_message, "POST message", 4096, NULL, 6, NULL);
-    // get_task();
-
 }
