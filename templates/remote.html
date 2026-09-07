@@ -1,6 +1,7 @@
 <html>
     <head>
         <title>{{ remote.label }}</title>
+        <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     </head>
 
     <body>
@@ -14,11 +15,30 @@
         <ul>
             {% for button in buttons %}
                 <li>
-                    <a href="/remotes/{{ remote.id }}/buttons/{{ button.id }}">
+                    <button  class="command-button" data-remote-id="{{ remote.id }}" data-button-id="{{ button.id }}">
                         {{ button.label }}
-                    </a>
+                    </button>
     
-                    <button class="delete-button" data-remote-id="{{ remote.id }}" data-button-id="{{ button.id }}" > Delete </button>
+                    <button class="delete-button" data-remote-id="{{ remote.id }}" data-button-id="{{ button.id }}" > 
+                        <img src="{{ url_for('static', filename='delete.jpg') }}" alt="submit">    
+                    </button>
+
+                    <button class="rename-button" data-remote-id="{{ remote.id }}" data-button-id="{{ button.id }}" > 
+                        <img src="{{ url_for('static', filename='edit.png') }}" alt="submit">
+                    </button>
+                    
+                    <form class="rename-button-form" data-remote-id="{{ remote.id }}" data-button-id="{{ button.id }}" hidden>
+                        <input type="text" name="label" value="{{ button.label }}">
+                
+                        <button type="submit">
+                            <img src="{{ url_for('static', filename='yes.png') }}" alt="submit">
+                        </button>
+                        
+                        <button type="button" class="cancel-rename-button">
+                            <img src="{{ url_for('static', filename='cancel.jpeg') }}" alt="cancel">
+                        </button>
+                        <p class="error-empty-button"></p>
+                    </form>
                 </li>
             {% endfor %}
         </ul>

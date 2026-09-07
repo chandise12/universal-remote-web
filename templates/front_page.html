@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>IR Remote</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <h1>Remote Database</h1>
@@ -15,7 +16,28 @@
                     {{ remote.label }}
                 </a>
 
-                <button class="delete-remote" data-remote-id="{{ remote.id }}" > Delete</button>
+                <button class="delete-remote" data-remote-id="{{ remote.id }}">
+                    <img src="{{ url_for('static', filename='delete.jpg') }}" alt="submit">
+                </button>
+
+                <button class="rename-remote" data-remote-id="{{ remote.id }}">
+                    <img src="{{ url_for('static', filename='edit.png') }}" alt="submit">
+                </button>
+
+                <form class="rename-remote-form" data-remote-id="{{ remote.id }}" hidden>
+                    <input type="text" name="label" value="{{ remote.label }}">
+            
+                    <button type="submit">
+                        <img src="{{ url_for('static', filename='yes.png') }}" alt="submit">
+                    </button>
+                    
+                    <button type="button" class="cancel-rename-remote">
+                        <img src="{{ url_for('static', filename='cancel.jpeg') }}" alt="cancel">
+                    </button>
+                    <p class="error-empty-remote"></p>
+                </form>
+
+
             </li>
         {% endfor %}
     </ul>
