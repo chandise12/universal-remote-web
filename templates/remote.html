@@ -15,18 +15,18 @@
         <ul>
             {% for button in buttons %}
                 <li>
-                    <button  class="command-button" data-remote-id="{{ remote.id }}" data-button-id="{{ button.id }}">
-                        {{ button.label }}
-                    </button>
-    
                     <button class="delete-button" data-remote-id="{{ remote.id }}" data-button-id="{{ button.id }}" > 
                         <img src="{{ url_for('static', filename='delete.jpg') }}" alt="submit">    
                     </button>
 
+                    <button  class="command-button" data-remote-id="{{ remote.id }}" data-button-id="{{ button.id }}">
+                        {{ button.label }}
+                    </button>
+    
                     <button class="rename-button" data-remote-id="{{ remote.id }}" data-button-id="{{ button.id }}" > 
                         <img src="{{ url_for('static', filename='edit.png') }}" alt="submit">
                     </button>
-                    
+
                     <form class="rename-button-form" data-remote-id="{{ remote.id }}" data-button-id="{{ button.id }}" hidden>
                         <input type="text" name="label" value="{{ button.label }}">
                 

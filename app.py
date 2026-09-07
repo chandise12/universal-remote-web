@@ -11,12 +11,6 @@ esp_status = {"status": "IDLE",
 
 user_status = {"status": "IDLE"}
 
-#db routes
-@app.route("/init", methods=["GET"])
-def init_db_route():
-    database.init_db()
-    return jsonify({"status": "ok"}), 201
-
 # esp32 routes
 @app.route('/ir/upload', methods=['POST'])
 def ir_rcv_and_save():
@@ -201,6 +195,7 @@ def handle_button_command(remote_id, button_id):
 
 
 if __name__ == '__main__':
+    database.init_db()
     app.run(
         host="0.0.0.0",
         port=5000,

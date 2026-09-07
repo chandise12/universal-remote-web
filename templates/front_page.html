@@ -12,13 +12,13 @@
     <ul>
         {% for remote in remotes %}
             <li>
-                <a href="/remotes/{{ remote.id }}/buttons" >
-                    {{ remote.label }}
-                </a>
-
                 <button class="delete-remote" data-remote-id="{{ remote.id }}">
                     <img src="{{ url_for('static', filename='delete.jpg') }}" alt="submit">
                 </button>
+
+                <a href="/remotes/{{ remote.id }}/buttons" >
+                    {{ remote.label }}
+                </a>
 
                 <button class="rename-remote" data-remote-id="{{ remote.id }}">
                     <img src="{{ url_for('static', filename='edit.png') }}" alt="submit">
