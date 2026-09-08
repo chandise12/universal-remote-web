@@ -78,9 +78,9 @@ The configuration file should follow the following structure:
 #define WIFI_SSID       "your_wifi_ssid"
 #define WIFI_PASSWORD   "your_wifi_password"
 
-#define URL_1           "http://your-server-ip//ir/get_state"
-#define URL_2           "http://your-server-ip//ir/clear_task"
-#define URL_3           "http://your-server-ip//ir/upload"
+#define COMMAND_URL           "http://your-server-ip//ir/get_state"
+#define CLEAR_URL           "http://your-server-ip//ir/clear_task"
+#define UPLOAD_URL           "http://your-server-ip//ir/upload"
 
 ```
 
