@@ -2,3 +2,4 @@
 .env
 .DS_Store
 database.db
+db/__pycache__
